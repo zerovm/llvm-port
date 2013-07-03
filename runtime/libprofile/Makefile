@@ -15,7 +15,7 @@ BYTECODE_LIBRARY = 1
 endif
 LIBRARYNAME = profile_rt
 LINK_LIBS_IN_SHARED = 1
-SHARED_LIBRARY = 1
+
 EXTRA_DIST = libprofile.exports
 EXPORTED_SYMBOL_FILE = $(PROJ_SRC_DIR)/libprofile.exports
 

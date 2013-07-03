@@ -19,7 +19,6 @@
 #include <unistd.h>
 #endif
 using namespace llvm;
-#ifndef __native_client__
 /// \brief Attempt to read the lock file with the given name, if it exists.
 ///
 /// \param LockFileName The name of the lock file to read.
@@ -225,4 +224,3 @@ void LockFileManager::waitForUnlock() {
   // Give up.
 }
 
-#endif

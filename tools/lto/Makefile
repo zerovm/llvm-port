@@ -12,7 +12,6 @@ LIBRARYNAME := LTO
 LINK_COMPONENTS := all-targets ipo scalaropts linker bitreader bitwriter \
                    mcdisassembler vectorize
 LINK_LIBS_IN_SHARED := 1
-SHARED_LIBRARY := 1
 
 EXPORTED_SYMBOL_FILE = $(PROJ_SRC_DIR)/lto.exports
 

@@ -117,9 +117,6 @@ error_code current_path(SmallVectorImpl<char> &result) {
 // For GNU Hurd
   result.reserve(1024);
 #endif
-#ifdef __native_client__
-  llvm_unreachable("current_path() not implemented for Native Client");
-#else
   while (true) {
     if (::getcwd(result.data(), result.capacity()) == 0) {
       // See if there was a real error.
@@ -132,7 +129,6 @@ error_code current_path(SmallVectorImpl<char> &result) {
   }
 
   result.set_size(strlen(result.data()));
-#endif
   return error_code::success();
 }
 

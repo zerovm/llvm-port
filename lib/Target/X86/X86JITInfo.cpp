@@ -117,7 +117,9 @@ extern "C" {
     // (8 byte) if this is called from an indirect stub.
     "andq    $-16, %rsp\n"
     // Save all XMM arg registers
-    "subq    $128, %rsp\n"
+    // replace next line by nacl rsp decrement
+    //"subq    $128, %rsp\n"
+    "naclssp $128, %r15\n"
     "movaps  %xmm0, (%rsp)\n"
     "movaps  %xmm1, 16(%rsp)\n"
     "movaps  %xmm2, 32(%rsp)\n"
@@ -136,7 +138,9 @@ extern "C" {
 #else
     "movq    %rbp, %rdi\n"    // Pass prev frame and return address
     "movq    8(%rbp), %rsi\n"
-    "call    " ASMPREFIX "LLVMX86CompilationCallback2\n"
+    // "call    " ASMPREFIX "LLVMX86CompilationCallback2\n"
+    "movq     $" ASMPREFIX "LLVMX86CompilationCallback2, %rax\n"
+    "naclcall %eax,%r15\n"
 #endif
     // Restore all XMM arg registers
     "movaps  112(%rsp), %xmm7\n"
@@ -151,7 +155,9 @@ extern "C" {
     "movq    %rbp, %rsp\n"
     CFI(".cfi_def_cfa_register %rsp\n")
     // Restore all int arg registers
-    "subq    $48, %rsp\n"
+    // replace rsp modification with nacl eq
+    // "subq    $48, %rsp\n"
+    "naclssp $48,%r15\n"
     CFI(".cfi_adjust_cfa_offset 48\n")
     "popq    %r9\n"
     CFI(".cfi_adjust_cfa_offset -8\n")
@@ -172,10 +178,15 @@ extern "C" {
     CFI(".cfi_adjust_cfa_offset -8\n")
     CFI(".cfi_restore %rdi\n")
     // Restore RBP
-    "popq    %rbp\n"
+    // replace with nacl eq
+    // "popq    %rbp\n"
+    "naclrestbp (%rsp),%r15\n"
     CFI(".cfi_adjust_cfa_offset -8\n")
     CFI(".cfi_restore %rbp\n")
-    "ret\n"
+    // replace ret with nacljmp
+    // "ret\n"
+    "popq %rax\n"
+    "nacljmp %eax,%r15\n"
     CFI(".cfi_endproc\n")
     SIZE(X86CompilationCallback)
   );
