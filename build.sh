@@ -15,4 +15,4 @@ cd $BUILD_DIR
 --enable-jit=yes --enable-targets=x86,x86_64,cpp \
 --disable-assertions --with-gcc-toolchain=${ZVM_PREFIX}/x86_64-nacl
 
-CPPFLAGS+='-O0' make 
+CPPFLAGS='-O0' make -j9

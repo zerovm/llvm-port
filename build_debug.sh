@@ -16,4 +16,4 @@ cd $BUILD_DIR
 --enable-assertions --with-gcc-toolchain=${ZVM_PREFIX}/x86_64-nacl \
 --prefix=/ --exec-prefix=/
 
-CPPFLAGS+='-O0 -finstrument-functions' make -j3
+CPPFLAGS='-O0' make -j8
