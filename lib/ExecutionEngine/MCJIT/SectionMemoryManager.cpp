@@ -16,6 +16,7 @@
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/Memory.h"
 
 #ifdef __linux__
   // These includes used by SectionMemoryManager::getPointerToNamedFunction()
@@ -26,8 +27,101 @@
   #include <fcntl.h>
   #include <unistd.h>
 #endif
+#include <vector>
+
+#include "zvm.h"
+
+static char* AlignPtr(char *Ptr, size_t Alignment) {
+  assert(Alignment && (Alignment & (Alignment - 1)) == 0 &&
+         "Alignment is not a power of two!");
+
+  // Do the alignment.
+  return (char*)(((uintptr_t)Ptr + Alignment - 1) &
+                 ~(uintptr_t)(Alignment - 1));
+}
 
 namespace llvm {
+
+// @ZMOD-START
+class ZCodeMemoryAllocator {
+public:
+  ZCodeMemoryAllocator():
+    FunctionSlabStart(0), FunctionSlabEnd(0),
+    FreeSpaceStart(), FreeSpaceEnd(0),
+    TotalSize(0) {
+
+  }
+
+  uint8_t* allocate(uintptr_t Size,
+                    unsigned Alignment) {
+    // TODO: add slab overflow test
+    if (ZCodeSlabs.empty()) {
+      // allocate slab, add to code slab list
+      sys::MemoryBlock mb = allocateNewZSlab((size_t)SlabSize);
+
+      this->TotalSize += Size;
+      outs() << mb.base() << " " << mb.size() << " total Size=" << this->TotalSize << "\n";
+      if (!mb.base())
+        return 0;
+      ZCodeSlabs.push_back(mb);
+
+
+      // find first 64K alignment
+      uint8_t* start = (uint8_t*)AlignPtr((char*)mb.base(), (size_t)PageAlignment);
+      outs() << "start=" << start << "\n";
+      FunctionSlabStart = FunctionSlabEnd = start;
+
+      FreeSpaceEnd = (uint8_t*)mb.base() + mb.size();
+      FreeSpaceStart = start;
+      outs() << FreeSpaceStart << " " << FreeSpaceEnd << "\n";
+
+      return start;
+    }
+
+    // TODO: check if FunctionALignment is needed
+    outs() << "FreeSpaceStart=" << FreeSpaceStart << "\n";
+    return FreeSpaceStart;
+  }
+
+  uint8_t* Start() const {
+    return FunctionSlabStart;
+  }
+  size_t Size() const {
+    return TotalSize;
+  }
+
+private:
+  sys::MemoryBlock allocateNewZSlab(size_t size) {
+    error_code ec;
+    sys::MemoryBlock* Near = ZCodeSlabs.empty() ? 0 : &ZCodeSlabs.back();
+    sys::MemoryBlock MB = sys::Memory::allocateMappedMemory(size,
+                                                            Near,
+                                                            sys::Memory::MF_READ |
+                                                              sys::Memory::MF_WRITE,
+                                                            ec);
+    return MB;
+  }
+
+
+  std::vector<sys::MemoryBlock> ZCodeSlabs;
+  uint8_t*  FunctionSlabStart;
+  uint8_t*  FunctionSlabEnd;
+
+  // start/end free space boundaries
+  uint8_t*  FreeSpaceStart;
+  uint8_t*  FreeSpaceEnd;
+
+  // total requested size
+  size_t    TotalSize;
+
+  const static int SlabSize            = 0x1000000;    // 16 MB
+  const static int PageAlignment       = 0x10000;      // 64 K
+  const static int FunctionAlignment   = 0x20;         // 32 byte
+};
+
+// allocates code with page alignment
+ZCodeMemoryAllocator AllocatorHelper;
+// @ZMOD-END
 
 uint8_t *SectionMemoryManager::allocateDataSection(uintptr_t Size,
                                                     unsigned Alignment,
@@ -41,7 +135,10 @@ uint8_t *SectionMemoryManager::allocateDataSection(uintptr_t Size,
 uint8_t *SectionMemoryManager::allocateCodeSection(uintptr_t Size,
                                                    unsigned Alignment,
                                                    unsigned SectionID) {
-  return allocateSection(CodeMem, Size, Alignment);
+  // @ZMOD-START
+  return AllocatorHelper.allocate(Size, Alignment);
+//    return allocateSection(CodeMem, Size, Alignment);
+  // @ZMOD-END
 }
 
 uint8_t *SectionMemoryManager::allocateSection(MemoryGroup &MemGroup,
@@ -116,15 +213,26 @@ bool SectionMemoryManager::applyPermissions(std::string *ErrMsg)
   // FIXME: Should in-progress permissions be reverted if an error occurs?
   error_code ec;
 
+  // @ZMOD_START
   // Make code memory executable.
-  ec = applyMemoryGroupPermissions(CodeMem,
-                                   sys::Memory::MF_READ | sys::Memory::MF_EXEC);
-  if (ec) {
-    if (ErrMsg) {
-      *ErrMsg = ec.message();
-    }
+//  ec = applyMemoryGroupPermissions(CodeMem,
+//                                   sys::Memory::MF_READ | sys::Memory::MF_EXEC);
+//  if (ec) {
+//    if (ErrMsg) {
+//      *ErrMsg = ec.message();
+//    }
+//    return true;
+//  }
+  llvm::outs() << "Start=" << AllocatorHelper.Start()
+               << " Size=" << AllocatorHelper.Size() << "\n";
+  if (int err = zvm_jail(AllocatorHelper.Start(),
+                         AllocatorHelper.Size()) != 0) {
+    llvm::errs() << "zvm_jail res: " << err << " errno="<< errno << "\n";
     return true;
+
   }
+
+  // @ZMOD_END
 
   // Make read-only data memory read-only.
   ec = applyMemoryGroupPermissions(RODataMem,
