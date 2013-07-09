@@ -29,7 +29,9 @@
 #endif
 #include <vector>
 
+extern "C" {
 #include "zvm.h"
+}
 
 static char* AlignPtr(char *Ptr, size_t Alignment) {
   assert(Alignment && (Alignment & (Alignment - 1)) == 0 &&
@@ -226,7 +228,7 @@ bool SectionMemoryManager::applyPermissions(std::string *ErrMsg)
   llvm::outs() << "Start=" << AllocatorHelper.Start()
                << " Size=" << AllocatorHelper.Size() << "\n";
   if (int err = zvm_jail(AllocatorHelper.Start(),
-                         AllocatorHelper.Size()) != 0) {
+                         AllocatorHelper.Size())) {
     llvm::errs() << "zvm_jail res: " << err << " errno="<< errno << "\n";
     return true;
 
