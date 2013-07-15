@@ -583,6 +583,11 @@ namespace {
     void setPoisonMemory(bool poison) {
       PoisonMemory = poison;
     }
+
+    bool resetPermissions(std::string *ErrMsg)
+    {
+      return true;
+    }
   };
 }
 

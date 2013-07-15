@@ -80,6 +80,11 @@ void MCJIT::emitObject(Module *m) {
   if (isCompiled)
     return;
 
+  std::string ErrorString;
+  if (MemMgr->resetPermissions(&ErrorString)) {
+    report_fatal_error(ErrorString);
+  }
+
   PassManager PM;
 
   PM.add(new DataLayout(*TM->getDataLayout()));
@@ -151,6 +156,7 @@ void *MCJIT::getPointerToFunction(Function *F) {
   // dies.
 
   // FIXME: Add support for per-module compilation state
+  isCompiled = false; // force to recompile whole module
   if (!isCompiled)
     emitObject(M);
 
@@ -178,7 +184,8 @@ void *MCJIT::recompileAndRelinkFunction(Function *F) {
 }
 
 void MCJIT::freeMachineCodeForFunction(Function *F) {
-  report_fatal_error("not yet implemented");
+//  report_fatal_error("not yet implemented");
+  llvm::errs() << "feature not implemented, yet not needed. Function=" << F->getName() << "\n";
 }
 
 GenericValue MCJIT::runFunction(Function *F,
