@@ -18,7 +18,6 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Config/config.h"
 #include "llvm/IR/GlobalValue.h"
-#include "llvm/IR/Function.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -917,6 +916,12 @@ void *DefaultJITMemoryManager::getPointerToNamedFunction(const std::string &Name
   return 0;
 }
 
+
+
+JITMemoryManager *JITMemoryManager::CreateDefaultMemManager() {
+  return new DefaultJITMemoryManager();
+}
+
 // Allocate memory for code in 512K slabs.
 const size_t DefaultJITMemoryManager::DefaultCodeSlabSize = 512 * 1024;
 
@@ -925,139 +930,3 @@ const size_t DefaultJITMemoryManager::DefaultSlabSize = 64 * 1024;
 
 // Waste at most 16K at the end of each bump slab.  (probably 4 pages)
 const size_t DefaultJITMemoryManager::DefaultSizeThreshold = 16 * 1024;
-
-namespace {
-
-class CustomJITMemoryManager : public DefaultJITMemoryManager {
-public:
-  CustomJITMemoryManager();
-  virtual ~CustomJITMemoryManager();
-
-  virtual uint8_t *startFunctionBody(const Function *F,
-                                     uintptr_t &ActualSize) ;
-  virtual void endFunctionBody(const Function *F, uint8_t *FunctionStart,
-                               uint8_t *FunctionEnd) ;
-  virtual void deallocateFunctionBody(void *Body) ;
-  virtual bool finalizeMemory(std::string *ErrMsg = 0);
-
-private:
-  llvm::sys::MemoryBlock allocateNewZSlab(size_t size);
-
-
-  std::vector<llvm::sys::MemoryBlock> ZCodeSlabs;
-  uint8_t*  FunctionSlabStart;
-  uint8_t*  FunctionSlabEnd;
-
-  // start/end free space boudaries
-  uint8_t*  FreeSpaceStart;
-  uint8_t*  FreeSpaceEnd;
-};
-
-#include "zvm.h"
-
-#define slabSize 0x1000000 // 16 MB
-#define xAlignment 0x10000 // 64 K
-#define bAlignment 0x20 // 32 byte
-
-#define ZDEBUG __PRETTY_FUNCTION__ << " " << __LINE__ << "\n";
-
-
-/// AlignPtr - Align Ptr to Alignment bytes, rounding up.  Alignment should
-/// be a power of two.  This method rounds up, so AlignPtr(7, 4) == 8 and
-/// AlignPtr(8, 4) == 8.
-static char* AlignPtr(char *Ptr, size_t Alignment) {
-  assert(Alignment && (Alignment & (Alignment - 1)) == 0 &&
-         "Alignment is not a power of two!");
-
-  // Do the alignment.
-  return (char*)(((uintptr_t)Ptr + Alignment - 1) &
-                 ~(uintptr_t)(Alignment - 1));
-}
-
-CustomJITMemoryManager::CustomJITMemoryManager() {
-
-}
-CustomJITMemoryManager::~CustomJITMemoryManager() {
-}
-
-
-uint8_t* CustomJITMemoryManager::startFunctionBody(const llvm::Function *F,
-                                   uintptr_t &ActualSize) {
-  llvm::outs() << ZDEBUG;
-  llvm::outs() << F->getName() << " " << ActualSize << "\n";
-
-  if (ZCodeSlabs.empty()) {
-    // allocate slab, add to code slab list
-    llvm::sys::MemoryBlock mb = allocateNewZSlab((size_t)slabSize);
-    llvm::outs() << mb.base() << " " << mb.size() << "\n";
-    if (!mb.base())
-      return 0;
-    ZCodeSlabs.push_back(mb);
-
-
-
-    // find first 64K alignment
-    uint8_t* start = (uint8_t*)AlignPtr((char*)mb.base(), (size_t)xAlignment);
-    llvm::outs() << "start=" << start << "\n";
-    FunctionSlabStart = FunctionSlabEnd = start;
-
-    llvm::outs() << start << "\n";
-    ActualSize = mb.size() - (start - (uint8_t*)mb.base());
-    llvm::outs() << ActualSize << "\n";
-
-    FreeSpaceEnd = (uint8_t*)mb.base() + mb.size();
-    FreeSpaceStart = start;
-
-    llvm::outs() << FreeSpaceStart << " " << FreeSpaceEnd << "\n";
-
-    return start;
-  }
-
-  llvm::sys::MemoryBlock mb = ZCodeSlabs.back();
-  FreeSpaceStart = (uint8_t*)AlignPtr((char*)FreeSpaceEnd, (size_t)bAlignment);
-  ActualSize = mb.size() - (FreeSpaceStart - (uint8_t*)mb.base());
-  llvm::outs() << "FreeSpaceStart=" << FreeSpaceStart << " ActualSize=" << ActualSize << "\n";
-  return FreeSpaceStart;
-
-}
-
-void CustomJITMemoryManager::endFunctionBody(const llvm::Function *F, uint8_t *FunctionStart,
-                             uint8_t *FunctionEnd) {
-  // modify free space pointer
-  llvm::outs() << ZDEBUG;
-  llvm::outs() << "FunctionEnd=" <<FunctionEnd << "\n";
-  FreeSpaceEnd = FunctionEnd;
-}
-
-void CustomJITMemoryManager::deallocateFunctionBody(void *Body) {
-  llvm::outs() << ZDEBUG;
-  llvm::outs() << Body << "\n";
-}
-
-llvm::sys::MemoryBlock CustomJITMemoryManager::allocateNewZSlab(size_t size) {
-  llvm::outs() << ZDEBUG;
-  // Allocate a new block close to the last one.
-  std::string ErrMsg;
-  llvm::sys::MemoryBlock B = llvm::sys::Memory::AllocateRWX(size, 0, &ErrMsg);
-  if (B.base() == 0) {
-    report_fatal_error("Allocation failed when allocating new memory in the"
-                       " JIT\n" + llvm::Twine(ErrMsg));
-  }
-
-  return B;
-}
-bool CustomJITMemoryManager::finalizeMemory(std::string *ErrMsg) {
-  // do zerovm jail here
-  llvm::outs() << ZDEBUG;
-
-  return false;
-}
-
-}
-
-
-
-
-JITMemoryManager *JITMemoryManager::CreateDefaultMemManager() {
-    return new CustomJITMemoryManager();
-}
