@@ -6,6 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
+#include <unistd.h>
 
 #include "llvm/ExecutionEngine/ZMemoryManager.h"
 #include "llvm/ADT/OwningPtr.h"
@@ -62,6 +63,9 @@ TEST(ZMemoryManagerTest, BasicAllocations) {
   ASSERT_NE((uint8_t*)0, code2);
   ASSERT_NE((uint8_t*)0, data1);
   ASSERT_NE((uint8_t*)0, data2);
+  ASSERT_NE(code1, code2);
+  ASSERT_NE(code1, data1);
+  ASSERT_NE(code1, data2);
 
   // Initialize the data
   for (unsigned i = 0; i < 256; ++i) {
@@ -277,8 +281,21 @@ TEST(ZMemoryManagerTest, PermissionsTest) {
 
   std::string Error;
   EXPECT_FALSE(MemMgr->applyPermissions(&Error));
+  // Now we can't write into allocated memory
+  // But ZMemoryManager allocates huge memory block, alignes it to 64K
+  // boundary. Thus there is unused memory regions: in beginning and end.
+  // It should be RW, not RX. Try to write into that memory region
+  // Writing after code1+code2+PAGE_SIZE
+  const int PAGE_SIZE = sysconf(_SC_PAGESIZE);
+  uint8_t* tail_region = code2 + PAGE_SIZE;
+  *tail_region = 0;
+  SUCCEED();
   EXPECT_FALSE(MemMgr->resetPermissions(&Error));
+  // we expect memory permissions to be RW now
+  *tail_region = 0;
+  SUCCEED();
 }
+
 
 } // Namespace
 
