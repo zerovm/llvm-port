@@ -19,9 +19,7 @@ namespace llvm {
 /// TODO: consider memory blocks release (do we need that?)
 class ZCodeMemoryAllocator {
 public:
-  ZCodeMemoryAllocator():
-    FreeSpaceStart(0) {
-
+  ZCodeMemoryAllocator() {
   }
 
   /// \brief Allocates memory of given size with alignment
@@ -40,24 +38,22 @@ public:
     uint8_t* start = NULL;
 
     if (ZCodeSlabs.empty() ||
-        RequiredSize > (uintptr_t)ZCodeSlabs.back().base() + (uintptr_t)ZCodeSlabs.back().size() - (uintptr_t)FreeSpaceStart) {
+        RequiredSize > (uintptr_t)ZCodeSlabs.back().base() + (uintptr_t)ZCodeSlabs.back().size() - (uintptr_t)ZCodeSlabsEnd.back()) {
       // allocate slab, add to code slab list
       sys::MemoryBlock mb = allocateNewZSlab((size_t)SlabSize);
 
       if (!mb.base())
         return start;
       ZCodeSlabs.push_back(mb);
-      ZCodeSlabsEnd.push_back((uintptr_t)mb.base());
-
 
       // find first 64K alignment
       start = (uint8_t*)(((uintptr_t)mb.base() + PageAlignment - 1) & ~(uintptr_t)(PageAlignment - 1));
+      ZCodeSlabsEnd.push_back((uintptr_t)start);
     } else {
-      start = FreeSpaceStart;
+      start = (uint8_t*)ZCodeSlabsEnd.back();
     }
 
-    FreeSpaceStart = start + RequiredSize;
-    ZCodeSlabsEnd.back() = (uintptr_t)FreeSpaceStart;
+    ZCodeSlabsEnd.back() += RequiredSize;
     start = (uint8_t*)((uintptr_t)(start + Alignment - 1) & ~(uintptr_t)(Alignment - 1));
 
     return start;
@@ -115,15 +111,10 @@ private:
     return false;
   }
 
-
   /// vector of allocated memory blocks
   /// can't track client allocations inside them
   std::vector<sys::MemoryBlock> ZCodeSlabs;
   std::vector<uintptr_t>        ZCodeSlabsEnd;
-
-
-  /// free space start in last memory block
-  uint8_t*    FreeSpaceStart;
 
   const static int SlabSize            = 0x1000000;    // 16 MB
   const static int PageAlignment       = 0x10000;      // 64 K
