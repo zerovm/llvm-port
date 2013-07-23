@@ -440,7 +440,7 @@ void RuntimeDyldImpl::resolveExternalSymbols() {
         // This is an external symbol, try to get its address from
         // MemoryManager.
         uint8_t *Addr = (uint8_t*) MemMgr->getPointerToNamedFunction(Name.data(),
-                                                                   true);
+                                                                   false);
         DEBUG(dbgs() << "Resolving relocations Name: " << Name
                 << "\t" << format("%p", Addr)
                 << "\n");

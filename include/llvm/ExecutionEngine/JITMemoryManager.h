@@ -173,6 +173,11 @@ public:
   virtual unsigned GetNumStubSlabs() {
     return 0;
   }
+
+  /// resets page RX parmissions to RW, not implemented
+  bool resetPermissions(std::string *ErrMsg) {
+    return true;
+  }
 };
 
 } // end namespace llvm.

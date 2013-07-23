@@ -70,6 +70,7 @@ public:
   }
 
   bool applyPermissions(std::string *ErrMsg) { return false; }
+  bool resetPermissions(std::string *ErrMsg) { return false; }
 
   // Invalidate instruction cache for sections with execute permissions.
   // Some platforms with separate data cache and instruction cache require
