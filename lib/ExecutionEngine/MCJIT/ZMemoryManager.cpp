@@ -76,7 +76,8 @@ private:
   /// \brief Allocating code slab
   ///
   /// Try to allocate memory block of given size. On failure it will return
-  /// non-valid memory block: base address and size will be null
+  /// non-valid memory block: base address and size will be null. Under ZeroVM
+  /// it fills memory block with valid NOPs, which is valid instruction.
   ///
   /// \p size size of memory block to allocate
   /// \returns allocated memory block
@@ -88,6 +89,9 @@ private:
                                                             sys::Memory::MF_READ |
                                                               sys::Memory::MF_WRITE,
                                                             ec);
+#ifdef __native_client__
+    memset(MB.base(), 0x90, MB.size());
+#endif
     return MB;
   }
 
