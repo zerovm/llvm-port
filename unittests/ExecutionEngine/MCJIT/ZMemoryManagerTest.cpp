@@ -51,6 +51,24 @@ TEST(ZMemoryManagerTest, AlignedAllocation) {
   ASSERT_FALSE((uintptr_t)code1 & boundary);
 }
 
+TEST(ZMemoryManagerTest, NopFillTest) {
+#ifdef __native_client__
+  OwningPtr<SectionMemoryManager> MemMgr(new ZMemoryManager());
+
+  uint8_t *code = MemMgr->allocateCodeSection(256, 0, 1);
+
+  ASSERT_NE((uint8_t*)0, code);
+
+  for (int i=0;i<246;++i) {
+    EXPECT_EQ(code[i], 0x90);
+  }
+
+  std::string Error;
+  EXPECT_FALSE(MemMgr->applyPermissions(&Error));
+#endif
+  SUCEED();
+}
+
 TEST(ZMemoryManagerTest, BasicAllocations) {
   OwningPtr<SectionMemoryManager> MemMgr(new ZMemoryManager());
 
