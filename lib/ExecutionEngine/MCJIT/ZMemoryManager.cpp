@@ -4,6 +4,10 @@
 
 #include "llvm/Support/Memory.h"
 
+#ifdef __native_client__
+#include "zvm.h"
+#endif
+
 namespace llvm {
 
 
@@ -98,12 +102,22 @@ private:
   /// \p Permissions permissions to apply
   /// \returns false on success
   bool applyMemoryPermissions(unsigned int Permissions) {
+
     error_code ec;
     for (unsigned i=0;i<ZCodeSlabs.size();++i) {
       uint8_t* base = (uint8_t*)((((uintptr_t)ZCodeSlabs[i].base() + PageAlignment - 1) & ~(uintptr_t)(PageAlignment - 1)));
       size_t size = ZCodeSlabsEnd[i] - (uintptr_t)base;
+#ifdef __native_client__
+      int ret = (Permissions & sys::Memory::MF_EXEC) ? zvm_jail(base, size) : zvm_unjail(base, size);
+      if (ret) {
+        llvm::errs() << "Error during (un)jail system call. Error code is " << ret << "\n";
+        return true;
+      }
+      return false;
+#else
       ec = sys::Memory::protectMappedMemory(sys::MemoryBlock(base, size),
                                             Permissions);
+#endif
       if (ec)
         return true;
     }
@@ -133,18 +147,11 @@ uint8_t* ZMemoryManager::allocateCodeSection(uintptr_t Size, unsigned Alignment,
 
 bool ZMemoryManager::applyPermissions(std::string* ErrMsg)
 {
-  // apply permissions
-  bool ret = SectionMemoryManager::applyPermissions(ErrMsg);
-  if (ret)
-    return ret;
   return AllocatorHelper->setMemoryExecutable();
 }
 
 bool ZMemoryManager::resetPermissions(std::string* ErrMsg)
 {
-  bool ret = SectionMemoryManager::resetPermissions(ErrMsg);
-  if (ret)
-    return ret;
   return AllocatorHelper->setMemoryWritable();
 }
 
