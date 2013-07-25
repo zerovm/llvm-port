@@ -66,7 +66,7 @@ TEST(ZMemoryManagerTest, NopFillTest) {
   std::string Error;
   EXPECT_FALSE(MemMgr->applyPermissions(&Error));
 #endif
-  SUCEED();
+  SUCCEED();
 }
 
 TEST(ZMemoryManagerTest, BasicAllocations) {
