@@ -335,10 +335,18 @@ TEST(ZMemoryManagerTest, PermissionsTest) {
   uint8_t* tail_region = code2 + PAGE_SIZE;
   *tail_region = 0;
   SUCCEED();
+
   EXPECT_FALSE(MemMgr->resetPermissions(&Error));
   // we expect memory permissions to be RW now
-  *tail_region = 0;
-  SUCCEED();
+  for (unsigned i = 0; i < 256; ++i) {
+    code1[i] = 0x90;
+    code2[i] = 0x90;
+  }
+
+  for (unsigned i = 0; i < 256; ++i) {
+    EXPECT_EQ(0x90, code1[i]);
+    EXPECT_EQ(0x90, code2[i]);
+  }
 }
 
 
