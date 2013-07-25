@@ -110,6 +110,30 @@ TEST(ZMemoryManagerTest, BasicAllocations) {
 #endif
 }
 
+TEST(ZMemoryManagerTest, DeallocationTest) {
+#ifndef __native_client__
+  uint8_t *code1 = 0;
+  {
+    OwningPtr<SectionMemoryManager> MemMgr(new ZMemoryManager());
+
+    code1 = MemMgr->allocateCodeSection(256, 0, 1);
+
+    ASSERT_NE((uint8_t*)0, code1);
+    // Initialize the data
+    for (unsigned i = 0; i < 256; ++i) {
+      code1[i] = 1;
+    }
+    // Verify the data (this is checking for overlaps in the addresses)
+    for (unsigned i = 0; i < 256; ++i) {
+      EXPECT_EQ(1, code1[i]);
+    }
+  }
+
+  EXPECT_NE(code1, (uint8_t*)0);
+  EXPECT_DEATH(code1[0] = 1, "");
+#endif
+}
+
 TEST(ZMemoryManagerTest, LargeAllocations) {
   OwningPtr<SectionMemoryManager> MemMgr(new ZMemoryManager());
 
