@@ -1,6 +1,7 @@
 #include "llvm/ExecutionEngine/ZMemoryManager.h"
 
 #include <vector>
+#include <iostream>
 
 #include "llvm/Support/Memory.h"
 
@@ -24,6 +25,12 @@ namespace llvm {
 class ZCodeMemoryAllocator {
 public:
   ZCodeMemoryAllocator() {
+  }
+  ~ZCodeMemoryAllocator() {
+    error_code ec;
+    for (unsigned i=0;i<ZCodeSlabs.size();++i) {
+      ec = sys::Memory::releaseMappedMemory(ZCodeSlabs[i]);
+    }
   }
 
   /// \brief Allocates memory of given size with alignment
@@ -114,7 +121,7 @@ private:
 #ifdef __native_client__
       int ret = (Permissions & sys::Memory::MF_EXEC) ? zvm_jail(base, size) : zvm_unjail(base, size);
       if (ret) {
-        llvm::errs() << "Error during (un)jail system call. Error code is " << ret << "\n";
+        std::cout << "Error during (un)jail system call (Addr=" << std::hex << (uintptr_t)base << " size=" << std::dec << size << "). Error code is " << ret << std::endl;
         return true;
       }
       return false;

@@ -66,7 +66,7 @@ TEST(ZMemoryManagerTest, NopFillTest) {
   std::string Error;
   EXPECT_FALSE(MemMgr->applyPermissions(&Error));
 #endif
-  SUCEED();
+  SUCCEED();
 }
 
 TEST(ZMemoryManagerTest, BasicAllocations) {
@@ -102,7 +102,36 @@ TEST(ZMemoryManagerTest, BasicAllocations) {
   }
 
   std::string Error;
+#ifdef __native_client__
+  // 0x1 0x1 0x1 ... is not valid nacl code
+  EXPECT_TRUE(MemMgr->applyPermissions(&Error));
+#else
   EXPECT_FALSE(MemMgr->applyPermissions(&Error));
+#endif
+}
+
+TEST(ZMemoryManagerTest, DeallocationTest) {
+#ifndef __native_client__
+  uint8_t *code1 = 0;
+  {
+    OwningPtr<SectionMemoryManager> MemMgr(new ZMemoryManager());
+
+    code1 = MemMgr->allocateCodeSection(256, 0, 1);
+
+    ASSERT_NE((uint8_t*)0, code1);
+    // Initialize the data
+    for (unsigned i = 0; i < 256; ++i) {
+      code1[i] = 1;
+    }
+    // Verify the data (this is checking for overlaps in the addresses)
+    for (unsigned i = 0; i < 256; ++i) {
+      EXPECT_EQ(1, code1[i]);
+    }
+  }
+
+  EXPECT_NE(code1, (uint8_t*)0);
+  EXPECT_DEATH(code1[0] = 1, "");
+#endif
 }
 
 TEST(ZMemoryManagerTest, LargeAllocations) {
@@ -135,7 +164,11 @@ TEST(ZMemoryManagerTest, LargeAllocations) {
   }
 
   std::string Error;
+#ifdef __native_client__
+  EXPECT_TRUE(MemMgr->applyPermissions(&Error));
+#else
   EXPECT_FALSE(MemMgr->applyPermissions(&Error));
+#endif
 }
 
 TEST(ZMemoryManagerTest, ContiniousAllocations) {
@@ -160,6 +193,13 @@ TEST(ZMemoryManagerTest, ContiniousAllocations) {
     }
   }
 
+  std::string Error;
+#ifdef __native_client__
+  // 0xBE 0xBE 0xBE ... is not valid nacl code
+  EXPECT_TRUE(MemMgr->applyPermissions(&Error));
+#else
+  EXPECT_FALSE(MemMgr->applyPermissions(&Error));
+#endif
 }
 
 TEST(ZMemoryManagerTest, NonStaticAllocatorTest) {
@@ -185,6 +225,13 @@ TEST(ZMemoryManagerTest, NonStaticAllocatorTest) {
     // check alignment
     const int boundary = 0xFFFF; // 64K
     ASSERT_FALSE((uintptr_t)code1 & boundary);
+
+    std::string Error;
+#ifdef __native_client__
+    EXPECT_TRUE(MemMgr1->applyPermissions(&Error));
+#else
+    EXPECT_FALSE(MemMgr1->applyPermissions(&Error));
+#endif
   }
 
 }
@@ -219,9 +266,12 @@ TEST(ZMemoryManagerTest, ManyAllocations) {
       EXPECT_EQ(ExpectedData, data[i][j]);
     }
   }
-
   std::string Error;
+#ifdef __native_client__
+  EXPECT_TRUE(MemMgr->applyPermissions(&Error));
+#else
   EXPECT_FALSE(MemMgr->applyPermissions(&Error));
+#endif
 }
 
 TEST(ZMemoryManagerTest, ManyVariedAllocations) {
@@ -286,15 +336,16 @@ TEST(ZMemoryManagerTest, PermissionsTest) {
   ASSERT_NE((uint8_t*)0, code2);
 
   // Initialize the data
+  // 0x90 - NOP instruction, it's valid for nacl validator
   for (unsigned i = 0; i < 256; ++i) {
-    code1[i] = 1;
-    code2[i] = 2;
+    code1[i] = 0x90;
+    code2[i] = 0x90;
   }
 
   // Verify the data (this is checking for overlaps in the addresses)
   for (unsigned i = 0; i < 256; ++i) {
-    EXPECT_EQ(1, code1[i]);
-    EXPECT_EQ(2, code2[i]);
+    EXPECT_EQ(0x90, code1[i]);
+    EXPECT_EQ(0x90, code2[i]);
   }
 
   std::string Error;
@@ -308,10 +359,18 @@ TEST(ZMemoryManagerTest, PermissionsTest) {
   uint8_t* tail_region = code2 + PAGE_SIZE;
   *tail_region = 0;
   SUCCEED();
+
   EXPECT_FALSE(MemMgr->resetPermissions(&Error));
   // we expect memory permissions to be RW now
-  *tail_region = 0;
-  SUCCEED();
+  for (unsigned i = 0; i < 256; ++i) {
+    code1[i] = 0x90;
+    code2[i] = 0x90;
+  }
+
+  for (unsigned i = 0; i < 256; ++i) {
+    EXPECT_EQ(0x90, code1[i]);
+    EXPECT_EQ(0x90, code2[i]);
+  }
 }
 
 
