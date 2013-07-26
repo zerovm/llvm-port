@@ -21,7 +21,11 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/Config/config.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
+#ifdef __native_client__
+#include "llvm/ExecutionEngine/ZMemoryManager.h"
+#else
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#endif
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
@@ -51,11 +55,19 @@ protected:
     , CodeModel(CodeModel::Default)
     , MArch("")
     , Builder(Context)
-    , MM(new SectionMemoryManager)
+    , MM(0)
     , HostTriple(sys::getProcessTriple())
   {
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();
+
+#ifdef __native_client__
+    MArch = "x86-64";
+    HostTriple = "x86_64-pc-nacl";
+    MM = new ZMemoryManager;
+#else
+    MM = new SectionMemoryManager;
+#endif
 
 #ifdef LLVM_ON_WIN32
     // On Windows, generate ELF objects by specifying "-elf" in triple
