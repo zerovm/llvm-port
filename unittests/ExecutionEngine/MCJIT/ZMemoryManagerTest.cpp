@@ -15,6 +15,8 @@
 
 using namespace llvm;
 
+const int NaClValidInst = 0x90;
+
 namespace {
 
 TEST(ZMemoryManagerTest, AlignedAllocation) {
@@ -60,7 +62,7 @@ TEST(ZMemoryManagerTest, NopFillTest) {
   ASSERT_NE((uint8_t*)0, code);
 
   for (int i=0;i<246;++i) {
-    EXPECT_EQ(code[i], 0x90);
+    EXPECT_EQ(code[i], NaClValidInst);
   }
 
   std::string Error;
@@ -119,11 +121,9 @@ TEST(ZMemoryManagerTest, DeallocationTest) {
     code1 = MemMgr->allocateCodeSection(256, 0, 1);
 
     ASSERT_NE((uint8_t*)0, code1);
-    // Initialize the data
     for (unsigned i = 0; i < 256; ++i) {
       code1[i] = 1;
     }
-    // Verify the data (this is checking for overlaps in the addresses)
     for (unsigned i = 0; i < 256; ++i) {
       EXPECT_EQ(1, code1[i]);
     }
@@ -217,7 +217,6 @@ TEST(ZMemoryManagerTest, NonStaticAllocatorTest) {
       code1[i] = 1;
     }
 
-    // Verify the data (this is checking for overlaps in the addresses)
     for (unsigned i = 0; i < 256; ++i) {
       EXPECT_EQ(1, code1[i]);
     }
@@ -327,7 +326,7 @@ TEST(ZMemoryManagerTest, ManyVariedAllocations) {
 }
 
 TEST(ZMemoryManagerTest, PermissionsTest) {
-  OwningPtr<SectionMemoryManager> MemMgr(new ZMemoryManager());
+  OwningPtr<ZMemoryManager> MemMgr(new ZMemoryManager());
 
   uint8_t *code1 = MemMgr->allocateCodeSection(256, 0, 1);
   uint8_t *code2 = MemMgr->allocateCodeSection(256, 0, 3);
@@ -338,14 +337,14 @@ TEST(ZMemoryManagerTest, PermissionsTest) {
   // Initialize the data
   // 0x90 - NOP instruction, it's valid for nacl validator
   for (unsigned i = 0; i < 256; ++i) {
-    code1[i] = 0x90;
-    code2[i] = 0x90;
+    code1[i] = NaClValidInst;
+    code2[i] = NaClValidInst;
   }
 
   // Verify the data (this is checking for overlaps in the addresses)
   for (unsigned i = 0; i < 256; ++i) {
-    EXPECT_EQ(0x90, code1[i]);
-    EXPECT_EQ(0x90, code2[i]);
+    EXPECT_EQ(NaClValidInst, code1[i]);
+    EXPECT_EQ(NaClValidInst, code2[i]);
   }
 
   std::string Error;
@@ -363,13 +362,13 @@ TEST(ZMemoryManagerTest, PermissionsTest) {
   EXPECT_FALSE(MemMgr->resetPermissions(&Error));
   // we expect memory permissions to be RW now
   for (unsigned i = 0; i < 256; ++i) {
-    code1[i] = 0x90;
-    code2[i] = 0x90;
+    code1[i] = NaClValidInst;
+    code2[i] = NaClValidInst;
   }
 
   for (unsigned i = 0; i < 256; ++i) {
-    EXPECT_EQ(0x90, code1[i]);
-    EXPECT_EQ(0x90, code2[i]);
+    EXPECT_EQ(NaClValidInst, code1[i]);
+    EXPECT_EQ(NaClValidInst, code2[i]);
   }
 }
 
