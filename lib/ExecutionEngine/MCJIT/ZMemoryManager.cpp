@@ -43,11 +43,13 @@ public:
     if (!Alignment)
       Alignment = 16;
 
+    // calculate required size, it could be greater due to alignment
     uintptr_t RequiredSize = (Size % Alignment) ?
                                Alignment * ((Size + Alignment - 1)/Alignment + 1):
                                Size;
     uint8_t* start = NULL;
 
+    // if no memory were allocated OR there no enough free space if block left
     if (ZCodeSlabs.empty() ||
         RequiredSize > (uintptr_t)ZCodeSlabs.back().base() + (uintptr_t)ZCodeSlabs.back().size() - (uintptr_t)ZCodeSlabsEnd.back()) {
       // allocate slab, add to code slab list
@@ -59,22 +61,27 @@ public:
 
       // find first 64K alignment
       start = (uint8_t*)(((uintptr_t)mb.base() + PageAlignment - 1) & ~(uintptr_t)(PageAlignment - 1));
+      // save initial start position
       ZCodeSlabsEnd.push_back((uintptr_t)start);
     } else {
+      // just take start position, no allocation needed
       start = (uint8_t*)ZCodeSlabsEnd.back();
     }
 
+    // move free space start position
     ZCodeSlabsEnd.back() += RequiredSize;
     start = (uint8_t*)((uintptr_t)(start + Alignment - 1) & ~(uintptr_t)(Alignment - 1));
 
     return start;
   }
 
-  /// Sets allocated memory ready for execution
+  /// \brief Sets allocated memory ready for execution
+  /// \returns false on success
   bool setMemoryExecutable() {
     return applyMemoryPermissions(sys::Memory::MF_READ | sys::Memory::MF_EXEC);
   }
-  /// Sets allocated memory ready for write
+  /// \brief Sets allocated memory ready for write
+  /// \returns false on success
   bool setMemoryWritable() {
     return applyMemoryPermissions(sys::Memory::MF_READ | sys::Memory::MF_WRITE);
   }
@@ -116,7 +123,9 @@ private:
 
     error_code ec;
     for (unsigned i=0;i<ZCodeSlabs.size();++i) {
+      // calculate base address of memory block (64K alignment)
       uint8_t* base = (uint8_t*)((((uintptr_t)ZCodeSlabs[i].base() + PageAlignment - 1) & ~(uintptr_t)(PageAlignment - 1)));
+      // and its size
       size_t size = ZCodeSlabsEnd[i] - (uintptr_t)base;
 #ifdef __native_client__
       int ret = (Permissions & sys::Memory::MF_EXEC) ? zvm_jail(base, size) : zvm_unjail(base, size);
@@ -136,9 +145,10 @@ private:
     return false;
   }
 
-  /// vector of allocated memory blocks
-  /// can't track client allocations inside them
+  // vector of allocated memory blocks
+  // can't track client allocations inside them
   std::vector<sys::MemoryBlock> ZCodeSlabs;
+  // vector of free space position start for each memory block
   std::vector<uintptr_t>        ZCodeSlabsEnd;
 
   const static int SlabSize            = 0x1000000;    // 16 MB
