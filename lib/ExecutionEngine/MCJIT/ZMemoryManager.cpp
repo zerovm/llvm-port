@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "llvm/Support/Memory.h"
+#include "llvm/Support/Debug.h"
 
 #ifdef __native_client__
 #include "zvm.h"
@@ -72,6 +73,9 @@ public:
     ZCodeSlabsEnd.back() += RequiredSize;
     start = (uint8_t*)((uintptr_t)(start + Alignment - 1) & ~(uintptr_t)(Alignment - 1));
 
+    DEBUG(dbgs() << "allocating " << RequiredSize << " bytes at 0x");
+    DEBUG(dbgs().write_hex((uintptr_t)start));
+    DEBUG(dbgs() << "\n");
     return start;
   }
 
