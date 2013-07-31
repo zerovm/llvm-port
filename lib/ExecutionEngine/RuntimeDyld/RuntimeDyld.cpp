@@ -149,7 +149,11 @@ ObjectImage *RuntimeDyldImpl::loadObject(ObjectBuffer *InputBuffer) {
 
       // If it's the first relocation in this section, find its SectionID
       if (isFirstRelocation) {
-        SectionID = findOrEmitSection(*obj, *si, true, LocalSections);
+        // eh_frame hack
+        bool IsCode = false;
+        Check(si->isText(IsCode));
+
+        SectionID = findOrEmitSection(*obj, *si, IsCode, LocalSections);
         DEBUG(dbgs() << "\tSectionID: " << SectionID << "\n");
         isFirstRelocation = false;
       }
