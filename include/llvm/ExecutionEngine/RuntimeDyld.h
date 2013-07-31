@@ -66,15 +66,6 @@ public:
   ///
   /// Returns true if an error occurred, false otherwise.
   virtual bool applyPermissions(std::string *ErrMsg = 0) = 0;
-
-  /// \brief Resets section-specific memory permissions.
-  ///
-  /// This method is called when compiling new function after applyPermissions()
-  /// was called. Memory manager will reset permissions to read-write, so it
-  /// would be possible to JIT new functions.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  virtual bool resetPermissions(std::string *ErrMsg = 0) = 0;
 };
 
 class RuntimeDyld {

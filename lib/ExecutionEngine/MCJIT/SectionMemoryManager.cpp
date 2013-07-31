@@ -140,33 +140,6 @@ bool SectionMemoryManager::applyPermissions(std::string *ErrMsg)
 
   return false;
 }
-bool SectionMemoryManager::resetPermissions(std::string *ErrMsg)
-{
-  error_code ec;
-
-  // Make code memory executable.
-  ec = applyMemoryGroupPermissions(CodeMem,
-                                   sys::Memory::MF_READ | sys::Memory::MF_WRITE);
-  if (ec) {
-    if (ErrMsg) {
-      *ErrMsg = ec.message();
-    }
-    return true;
-  }
-
-  // Make read-only data memory read-only.
-  ec = applyMemoryGroupPermissions(RODataMem,
-                                   sys::Memory::MF_READ | sys::Memory::MF_WRITE);
-  if (ec) {
-    if (ErrMsg) {
-      *ErrMsg = ec.message();
-    }
-    return true;
-  }
-
-  // Read-write data memory already has the correct permissions
-  return false;
-}
 
 error_code SectionMemoryManager::applyMemoryGroupPermissions(MemoryGroup &MemGroup,
                                                              unsigned Permissions) {

@@ -583,7 +583,6 @@ namespace {
     void setPoisonMemory(bool poison) {
       PoisonMemory = poison;
     }
-
   };
 }
 

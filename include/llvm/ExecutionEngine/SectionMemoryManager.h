@@ -72,15 +72,6 @@ public:
   /// \returns true if an error occurred, false otherwise.
   virtual bool applyPermissions(std::string *ErrMsg = 0);
 
-  /// \brief Resets section-specific memory permissions.
-  ///
-  /// This method is called when compiling new function after applyPermissions()
-  /// was called. Memory manager will reset permissions to read-write, so it
-  /// would be possible to JIT new functions.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  virtual bool resetPermissions(std::string *ErrMsg = 0);
-
   /// This method returns the address of the specified function. As such it is
   /// only useful for resolving library symbols, not code generated symbols.
   ///
