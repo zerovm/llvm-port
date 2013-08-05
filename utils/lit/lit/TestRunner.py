@@ -10,6 +10,8 @@ import tempfile
 
 import re
 
+from ParseCommandForZeroVM import prepareTestForZeroVM
+
 class InternalShellError(Exception):
     def __init__(self, command, message):
         self.command = command
@@ -465,8 +467,14 @@ def executeShTest(test, litConfig, useExternalSh,
     # Create the output directory if it does not already exist.
     Util.mkdir_p(os.path.dirname(tmpBase))
 
+    # modify script to run under ZeroVM
+    cmds = []
+    for cmd in script:
+        cmds.append(prepareTestForZeroVM(cmd))
+
+
     if useExternalSh:
-        res = executeScript(test, litConfig, tmpBase, script, execdir)
+        res = executeScript(test, litConfig, tmpBase, cmds, execdir)
     else:
         res = executeScriptInternal(test, litConfig, tmpBase, script, execdir)
     if len(res) == 2:
@@ -489,4 +497,4 @@ def executeShTest(test, litConfig, useExternalSh,
     if ok:
         return (status,'')
 
-    return formatTestOutput(status, out, err, exitCode, script)
+    return formatTestOutput(status, out, err, exitCode, cmds)
