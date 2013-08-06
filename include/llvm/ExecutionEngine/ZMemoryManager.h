@@ -17,6 +17,10 @@
 
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 
+namespace ELFIO {
+class elfio;
+}
+
 namespace llvm {
 
 class ZCodeMemoryAllocator;
@@ -62,8 +66,23 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   virtual bool resetPermissions(std::string *ErrMsg = 0);
+
+  /// This method returns the address of the specified function. As such it is
+  /// only useful for resolving library symbols, not code generated symbols.
+  ///
+  /// If \p AbortOnFailure is false and no function with the given name is
+  /// found, this function returns a null pointer. Otherwise, it prints a
+  /// message to stderr and aborts.
+  virtual void *getPointerToNamedFunction(const std::string &Name,
+                                          bool AbortOnFailure = true);
 private:
   OwningPtr<ZCodeMemoryAllocator> AllocatorHelper;
+
+  /// ELF-file reader object
+  OwningPtr<ELFIO::elfio> ELFReader;
+  /// flag indicating ELF file had been successfully loaded
+  bool                    isLoaded;
+
 };
 }
 

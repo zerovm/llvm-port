@@ -3,6 +3,8 @@
 #include <vector>
 #include <iostream>
 
+#include <elfio/elfio.hpp>
+
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Debug.h"
 
@@ -161,7 +163,9 @@ private:
 
 
 ZMemoryManager::ZMemoryManager():
-  AllocatorHelper(new ZCodeMemoryAllocator()) {
+  AllocatorHelper(new ZCodeMemoryAllocator()),
+  ELFReader(new ELFIO::elfio),
+  isLoaded(false) {
 }
 ZMemoryManager::~ZMemoryManager() {
 }
@@ -178,6 +182,54 @@ bool ZMemoryManager::applyPermissions(std::string* ErrMsg)
 bool ZMemoryManager::resetPermissions(std::string* ErrMsg)
 {
   return AllocatorHelper->setMemoryWritable();
+}
+
+void* ZMemoryManager::getPointerToNamedFunction(const std::string& Name, bool AbortOnFailure)
+{
+  // if elf is not loaded, load it now
+  // TODO: parametrize file name
+  if (!isLoaded)
+   isLoaded = ELFReader->load("/dev/self");
+
+  if (isLoaded)
+  {
+    // elf is loaded succesfully
+    std::string         name;
+    ELFIO::Elf64_Addr   value;
+    ELFIO::Elf_Xword    size;
+    unsigned char       bind;
+    unsigned char       type;
+    ELFIO::Elf_Half     section_index;
+    unsigned char       other;
+
+    // iterate over sections
+    // to find symtab section
+    ELFIO::Elf_Half sec_num = ELFReader->sections.size();
+    for ( int i = 0; i < sec_num; ++i ) {
+      ELFIO::section* psec = ELFReader->sections[i];
+      // check section flags
+      if ( psec->get_type() == SHT_SYMTAB ) {
+        // symbol iterator
+        ELFIO::symbol_section_accessor symbols( *ELFReader.get(), psec );
+        // symbol lookup by name won't work cause we don't have .hash
+        // section in NaCl ELF
+        // TODO: optimize symbol lookup
+        for (int i=0, count=symbols.get_symbols_num();i<count;++i) {
+          symbols.get_symbol(i, name, value, size, bind,
+                             type, section_index, other);
+
+          if (name == Name)
+            return (void*)(uintptr_t)(0x440a00000000LL + value);
+        }
+      }
+    }
+  }
+
+  if (AbortOnFailure)
+    report_fatal_error("Program used external function '" + Name +
+                      "' which could not be resolved!");
+
+  return NULL;
 }
 
 }
