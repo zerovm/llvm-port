@@ -17,6 +17,15 @@ using namespace llvm;
 
 const int NaClValidInst = 0x90;
 
+
+extern "C" {
+int return_one() {
+  return 1;
+}
+int return_plus_seven(int a) {
+  return a+7;
+}
+}
 namespace {
 
 TEST(ZMemoryManagerTest, AlignedAllocation) {
@@ -370,6 +379,41 @@ TEST(ZMemoryManagerTest, PermissionsTest) {
     EXPECT_EQ(NaClValidInst, code1[i]);
     EXPECT_EQ(NaClValidInst, code2[i]);
   }
+}
+
+
+TEST(ZMemoryManagerTest, FunctionResolutionTest) {
+  // ZMemoryManager symbol lookup is workaround due to
+  // unavailability dlsym()
+  // Use SectionMemoryManager on host anyway
+#ifdef __native_client__
+  OwningPtr<SectionMemoryManager> MemMgr(new ZMemoryManager());
+  typedef int (*one)();
+  typedef int (*seven)(int);
+
+  one return_one_ptr = (one)(intptr_t)MemMgr->getPointerToNamedFunction("return_one", false);
+  ASSERT_NE(return_one_ptr, (one)NULL);
+  EXPECT_EQ(return_one_ptr(), 1);
+
+  seven return_seven_ptr = (seven)(intptr_t)MemMgr->getPointerToNamedFunction("return_plus_seven", false);
+  ASSERT_NE(return_seven_ptr, (seven)NULL);
+  EXPECT_EQ(return_seven_ptr(4), 11);
+  EXPECT_EQ(return_seven_ptr(0), 7);
+  EXPECT_EQ(return_seven_ptr(-7), 0);
+
+  // non-existent function
+  typedef void (*nullPtr)(void);
+  nullPtr nullFunc = (nullPtr)(intptr_t)MemMgr->getPointerToNamedFunction("some_longlonglong_name", false);
+  ASSERT_EQ(nullFunc, (nullPtr)NULL);
+
+  // stdc libm function - sqrt
+  typedef double (*sqrtPtr)(double);
+  sqrtPtr sqrtFunc= (sqrtPtr)(intptr_t)MemMgr->getPointerToNamedFunction("sqrt", false);
+  ASSERT_NE(sqrtFunc, (sqrtPtr)NULL);
+  EXPECT_EQ(sqrtFunc(4), 2);
+  EXPECT_EQ(sqrtFunc(256), 16);
+#endif
+  SUCCEED();
 }
 
 
