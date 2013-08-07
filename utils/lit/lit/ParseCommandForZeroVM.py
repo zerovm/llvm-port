@@ -63,7 +63,7 @@ def prepareTestForZeroVM(script):
             # check if arg is a file
             # index > 0 - disable command itself from parsing
             # previous arg should not be '<' - else it is stdin and shouldn't be parsed
-            if isNaClELF and isFile(arg) and last != "<" and last != ">" and last != ">>":
+            if isNaClELF and isFile(arg) and last not in ('>', '<', '>>', '<<'):
                 zvsh_command.append("@%s" % arg)
             else:
                 zvsh_command.append(arg)
@@ -82,6 +82,36 @@ def prepareTestForZeroVM(script):
     # inject non-parsable text back into input string
     # replace /dev/null with @null
     return injectStringArguments(result, replacements).replace(r'/dev/null', r'@null')
+
+def replacePipesWithStdRedirection(command):
+    """
+    Removes pipe usage from given command.
+    It will produce 'cmd1 > cmd1.out < cmd1.in ; cmd2 < cmd1.out > cmd2.out'
+    from 'cmd1 | cmd2'
+    """
+    result = command
+    cmds = []
+    for index, cmd in enumerate(result.split("|")):
+        args = cmd.split()
+        isStdOutAbsent = '>' not in args and '>>' not in args
+        isStdInAbsent = '<' not in args and '<<' not in args
+
+
+        # append explicit stdout/stdin redirection
+        if index > 0 and isStdInAbsent:
+            # adding output from previous cmd, so index = index+1 - 1
+            args.append('<')
+            args.append('cmd%d.out' % (index))
+        if isStdOutAbsent:
+            args.append('>')
+            args.append('cmd%d.out' % (index+1))
+
+        # restore full command
+        cmds.append(' '.join(args))
+
+    # restore all commands
+    result = ' ; '.join(cmds)
+    return result
 
 quotesRE = re.compile(r'(\".+?\")')
 def ejectStringArguments(input):
@@ -179,6 +209,7 @@ class ParseStringForZeroVMTest(unittest.TestCase):
     def test_parseWithAppendStdout(self):
         self.assertEqual(self.output_with_append_stdout, prepareTestForZeroVM(self.input_with_append_stdout))
 
+
 class ProcessStringArgumentsTest(unittest.TestCase):
     def setUp(self):
         self.grep_input = """/home/zvm/git/llvm-nacl/build_debug/Debug+Asserts/bin/llc < /home/zvm/git/llvm-nacl/test/CodeGen/X86/fp_load_fold.ll -march=x86 -x86-asm-syntax=intel |    grep -i ST | /home/zvm/git/llvm-nacl/build_debug/Debug+Asserts/bin/not grep "fadd\\|fsub\\|fdiv\\|fmul" """
@@ -198,3 +229,11 @@ class ProcessStringArgumentsTest(unittest.TestCase):
         self.assertEqual(len(ejectStringArguments(self.two_grep_input)[1]), 2)
         self.assertEqual(self.two_grep_input,
                          injectStringArguments(*ejectStringArguments(self.two_grep_input)))
+
+class ReplacePipesWithStdRedirection(unittest.TestCase):
+    def setUp(self):
+        self.input = """clang -cc1 -internal-isystem include -w -emit-llvm /home/zvm/git/llvm-nacl/tools/clang/test/CodeGen/weak_constant.c -O1 -o - | FileCheck /home/zvm/git/llvm-nacl/tools/clang/test/CodeGen/weak_constant.c"""
+        self.output = """clang -cc1 -internal-isystem include -w -emit-llvm /home/zvm/git/llvm-nacl/tools/clang/test/CodeGen/weak_constant.c -O1 -o - > cmd1.out ; FileCheck /home/zvm/git/llvm-nacl/tools/clang/test/CodeGen/weak_constant.c < cmd1.out > cmd2.out"""
+
+    def test_simpleCase(self):
+        self.assertEqual(self.output, replacePipesWithStdRedirection(self.input))

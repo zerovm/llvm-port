@@ -10,7 +10,7 @@ import tempfile
 
 import re
 
-from ParseCommandForZeroVM import prepareTestForZeroVM
+from ParseCommandForZeroVM import prepareTestForZeroVM, replacePipesWithStdRedirection
 
 class InternalShellError(Exception):
     def __init__(self, command, message):
@@ -470,7 +470,8 @@ def executeShTest(test, litConfig, useExternalSh,
     # modify script to run under ZeroVM
     cmds = []
     for cmd in script:
-        cmds.append(prepareTestForZeroVM(cmd))
+        cmds.append(replacePipesWithStdRedirection(prepareTestForZeroVM(cmd)))
+
 
 
     if useExternalSh:
