@@ -11,6 +11,7 @@
 #include "llvm/ExecutionEngine/ZMemoryManager.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ExecutionEngine/JIT.h"
+#include "llvm/Support/DynamicLibrary.h"
 #include "gtest/gtest.h"
 
 using namespace llvm;
@@ -390,6 +391,10 @@ TEST(ZMemoryManagerTest, FunctionResolutionTest) {
   OwningPtr<SectionMemoryManager> MemMgr(new ZMemoryManager());
   typedef int (*one)();
   typedef int (*seven)(int);
+
+  // have to call it explicitly due to absence of execution engine
+  std::string ErrorStr;
+  EXPECT_EQ(sys::DynamicLibrary::LoadLibraryPermanently(NULL, &ErrorStr), 0);
 
   one return_one_ptr = (one)(intptr_t)MemMgr->getPointerToNamedFunction("return_one", false);
   ASSERT_NE(return_one_ptr, (one)NULL);
